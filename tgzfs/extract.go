@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 )
 
 func Extract(src io.Reader, dest string) error {
@@ -20,6 +21,11 @@ func Extract(src io.Reader, dest string) error {
 
 		tarCmd := exec.Command(tarPath, "pzxf", "-", "-C", dest)
 		tarCmd.Stdin = src
+
+		// prevent ctrl+c and such from killing tar process
+		tarCmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+		}
 
 		out, err := tarCmd.CombinedOutput()
 		if err != nil {
