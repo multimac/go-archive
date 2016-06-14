@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/concourse/go-archiver/archivetest"
-	"github.com/concourse/go-archiver/tgzfs"
+	"github.com/concourse/go-archive/archivetest"
+	"github.com/concourse/go-archive/tgzfs"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -118,14 +118,14 @@ var _ = Describe("Extract", func() {
 
 		BeforeEach(func() {
 			oldPATH = os.Getenv("PATH")
-			os.Setenv("PATH", "/dev/null")
+			Expect(os.Setenv("PATH", "/dev/null")).To(Succeed())
 
 			_, err := exec.LookPath("tar")
 			Expect(err).To(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			os.Setenv("PATH", oldPATH)
+			Expect(os.Setenv("PATH", oldPATH)).To(Succeed())
 		})
 
 		It("extracts the TGZ's files, generating directories, and honoring file permissions and symlinks", extractionTest)

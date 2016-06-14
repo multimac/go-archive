@@ -3,36 +3,16 @@ package tgzfs
 import (
 	"archive/tar"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 )
 
 func Extract(src io.Reader, dest string) error {
 	tarPath, err := exec.LookPath("tar")
 	if err == nil {
-		err := os.MkdirAll(dest, 0755)
-		if err != nil {
-			return err
-		}
-
-		tarCmd := exec.Command(tarPath, "pzxf", "-", "-C", dest)
-		tarCmd.Stdin = src
-
-		// prevent ctrl+c and such from killing tar process
-		tarCmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid: true,
-		}
-
-		out, err := tarCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("tar extract failed (%s). output: %q", err, out)
-		}
-
-		return nil
+		return tarExtract(tarPath, src, dest)
 	}
 
 	gr, err := gzip.NewReader(src)

@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/concourse/go-archiver/archivetest"
-	"github.com/concourse/go-archiver/zipfs"
+	"github.com/concourse/go-archive/archivetest"
+	"github.com/concourse/go-archive/zipfs"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

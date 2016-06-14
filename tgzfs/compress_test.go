@@ -6,16 +6,18 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/concourse/go-archiver/tgzfs"
+	"github.com/concourse/go-archive/tgzfs"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Compress", func() {
-	var srcPath string
 	var buffer *bytes.Buffer
+	var workDir string
+	var paths []string
 	var compressErr error
 
 	BeforeEach(func() {
@@ -37,119 +39,120 @@ var _ = Describe("Compress", func() {
 		err = os.Symlink("some-file", filepath.Join(dir, "outer-dir", "inner-dir", "some-symlink"))
 		Expect(err).NotTo(HaveOccurred())
 
-		srcPath = filepath.Join(dir, "outer-dir")
 		buffer = new(bytes.Buffer)
+
+		workDir = filepath.Join(dir, "outer-dir")
+
+		paths = []string{}
 	})
 
 	JustBeforeEach(func() {
-		compressErr = tgzfs.Compress(srcPath, buffer)
+		compressErr = tgzfs.Compress(buffer, workDir, paths...)
 	})
 
-	It("writes a .tar.gz stream to the writer", func() {
-		Expect(compressErr).NotTo(HaveOccurred())
+	examples := func() {
+		Context("with . as a path", func() {
+			BeforeEach(func() {
+				paths = []string{"."}
+			})
 
-		gr, err := gzip.NewReader(buffer)
-		Expect(err).NotTo(HaveOccurred())
+			It("archives the directory's contents", func() {
+				Expect(compressErr).NotTo(HaveOccurred())
 
-		reader := tar.NewReader(gr)
+				gr, err := gzip.NewReader(buffer)
+				Expect(err).NotTo(HaveOccurred())
 
-		header, err := reader.Next()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(header.Name).To(Equal("outer-dir/"))
-		Expect(header.FileInfo().IsDir()).To(BeTrue())
+				reader := tar.NewReader(gr)
 
-		header, err = reader.Next()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(header.Name).To(Equal("outer-dir/inner-dir/"))
-		Expect(header.FileInfo().IsDir()).To(BeTrue())
+				header, err := reader.Next()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(header.Name).To(Equal("./"))
+				Expect(header.FileInfo().IsDir()).To(BeTrue())
 
-		header, err = reader.Next()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(header.Name).To(Equal("outer-dir/inner-dir/some-file"))
-		Expect(header.FileInfo().IsDir()).To(BeFalse())
+				header, err = reader.Next()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir"))
+				Expect(header.FileInfo().IsDir()).To(BeTrue())
 
-		contents, err := ioutil.ReadAll(reader)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(contents)).To(Equal("sup"))
+				header, err = reader.Next()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir/some-file"))
+				Expect(header.FileInfo().IsDir()).To(BeFalse())
 
-		header, err = reader.Next()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(header.Name).To(Equal("outer-dir/inner-dir/some-symlink"))
-		Expect(header.FileInfo().Mode() & os.ModeSymlink).To(Equal(os.ModeSymlink))
-		Expect(header.Linkname).To(Equal("some-file"))
-	})
+				contents, err := ioutil.ReadAll(reader)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(contents)).To(Equal("sup"))
 
-	Context("with a trailing slash", func() {
+				header, err = reader.Next()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir/some-symlink"))
+				Expect(header.FileInfo().Mode() & os.ModeSymlink).To(Equal(os.ModeSymlink))
+				Expect(header.Linkname).To(Equal("some-file"))
+			})
+		})
+
+		Context("with a single file as a path", func() {
+			BeforeEach(func() {
+				paths = []string{"inner-dir/some-file"}
+			})
+
+			It("archives the single file at the root", func() {
+				Expect(compressErr).NotTo(HaveOccurred())
+
+				gr, err := gzip.NewReader(buffer)
+				Expect(err).NotTo(HaveOccurred())
+
+				reader := tar.NewReader(gr)
+
+				header, err := reader.Next()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(header.Name).To(Equal("inner-dir/some-file"))
+				Expect(header.FileInfo().IsDir()).To(BeFalse())
+
+				contents, err := ioutil.ReadAll(reader)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(contents)).To(Equal("sup"))
+
+				_, err = reader.Next()
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("when there is no file at the given path", func() {
+			BeforeEach(func() {
+				paths = []string{"barf"}
+			})
+
+			It("returns an error", func() {
+				Expect(compressErr).To(HaveOccurred())
+			})
+		})
+	}
+
+	Context("with tar in the PATH", func() {
 		BeforeEach(func() {
-			srcPath = srcPath + "/"
+			_, err := exec.LookPath("tar")
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("archives the directory's contents", func() {
-			Expect(compressErr).NotTo(HaveOccurred())
-
-			gr, err := gzip.NewReader(buffer)
-			Expect(err).NotTo(HaveOccurred())
-
-			reader := tar.NewReader(gr)
-
-			header, err := reader.Next()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(header.Name).To(Equal("./"))
-			Expect(header.FileInfo().IsDir()).To(BeTrue())
-
-			header, err = reader.Next()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(header.Name).To(Equal("inner-dir/"))
-			Expect(header.FileInfo().IsDir()).To(BeTrue())
-
-			header, err = reader.Next()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(header.Name).To(Equal("inner-dir/some-file"))
-			Expect(header.FileInfo().IsDir()).To(BeFalse())
-
-			contents, err := ioutil.ReadAll(reader)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(string(contents)).To(Equal("sup"))
-
-			header, err = reader.Next()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(header.Name).To(Equal("inner-dir/some-symlink"))
-			Expect(header.FileInfo().Mode() & os.ModeSymlink).To(Equal(os.ModeSymlink))
-			Expect(header.Linkname).To(Equal("some-file"))
-		})
+		examples()
 	})
 
-	Context("with a single file", func() {
+	Context("with tar not in the PATH", func() {
+		var oldPATH string
+
 		BeforeEach(func() {
-			srcPath = filepath.Join(srcPath, "inner-dir", "some-file")
+			oldPATH = os.Getenv("PATH")
+			Expect(os.Setenv("PATH", "/dev/null")).To(Succeed())
+
+			_, err := exec.LookPath("tar")
+			Expect(err).To(HaveOccurred())
 		})
 
-		It("archives the single file at the root", func() {
-			Expect(compressErr).NotTo(HaveOccurred())
-
-			gr, err := gzip.NewReader(buffer)
-			Expect(err).NotTo(HaveOccurred())
-
-			reader := tar.NewReader(gr)
-
-			header, err := reader.Next()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(header.Name).To(Equal("some-file"))
-			Expect(header.FileInfo().IsDir()).To(BeFalse())
-
-			contents, err := ioutil.ReadAll(reader)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(string(contents)).To(Equal("sup"))
-		})
-	})
-
-	Context("when there is no file at the given path", func() {
-		BeforeEach(func() {
-			srcPath = filepath.Join(srcPath, "barf")
+		AfterEach(func() {
+			Expect(os.Setenv("PATH", oldPATH)).To(Succeed())
 		})
 
-		It("returns an error", func() {
-			Expect(compressErr).To(BeAssignableToTypeOf(&os.PathError{}))
-		})
+		examples()
 	})
 })

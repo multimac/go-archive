@@ -5,43 +5,49 @@ import (
 	"compress/gzip"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
-func Compress(srcPath string, dest io.Writer) error {
-	absPath, err := filepath.Abs(srcPath)
+func Compress(dest io.Writer, workDir string, paths ...string) error {
+	if tarPath, err := exec.LookPath("tar"); err == nil {
+		return tarCompress(tarPath, dest, workDir, paths...)
+	}
+
+	absWorkDir, err := filepath.Abs(workDir)
 	if err != nil {
 		return err
 	}
 
-	gz := gzip.NewWriter(dest)
-	defer gz.Close()
+	gzWriter := gzip.NewWriter(dest)
+	defer gzWriter.Close()
 
-	tw := tar.NewWriter(gz)
-	defer tw.Close()
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
 
-	err = filepath.Walk(absPath, func(path string, info os.FileInfo, err error) error {
+	for _, p := range paths {
+		err := writePathToTar(tarWriter, absWorkDir, filepath.Join(absWorkDir, p))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writePathToTar(tw *tar.Writer, workDir string, srcPath string) error {
+	return filepath.Walk(srcPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		var relative string
-		if os.IsPathSeparator(srcPath[len(srcPath)-1]) {
-			relative, err = filepath.Rel(absPath, path)
-		} else {
-			relative, err = filepath.Rel(filepath.Dir(absPath), path)
-		}
-
-		relative = filepath.ToSlash(relative)
-
+		relative, err := filepath.Rel(workDir, path)
 		if err != nil {
 			return err
 		}
 
 		return addTarFile(path, relative, tw)
 	})
-
-	return err
 }
 
 func addTarFile(path, name string, tw *tar.Writer) error {
