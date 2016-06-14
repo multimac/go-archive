@@ -1,4 +1,4 @@
-package compressor_test
+package zipfs_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestCompressor(t *testing.T) {
+func TestZipfs(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Compressor Suite")
+	RunSpecs(t, "Zipfs Suite")
 }

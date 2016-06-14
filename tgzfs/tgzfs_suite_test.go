@@ -1,4 +1,4 @@
-package extractor_test
+package tgzfs_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestExtractor(t *testing.T) {
+func TestTgzfs(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Extractor Suite")
+	RunSpecs(t, "Tgzfs Suite")
 }

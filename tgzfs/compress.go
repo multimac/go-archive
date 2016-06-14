@@ -1,19 +1,23 @@
-package compressor
+package tgzfs
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
 )
 
-func WriteTar(srcPath string, dest io.Writer) error {
+func Compress(srcPath string, dest io.Writer) error {
 	absPath, err := filepath.Abs(srcPath)
 	if err != nil {
 		return err
 	}
 
-	tw := tar.NewWriter(dest)
+	gz := gzip.NewWriter(dest)
+	defer gz.Close()
+
+	tw := tar.NewWriter(gz)
 	defer tw.Close()
 
 	err = filepath.Walk(absPath, func(path string, info os.FileInfo, err error) error {

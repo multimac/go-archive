@@ -1,22 +1,22 @@
-package compressor_test
+package tgzfs_test
 
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/concourse/go-archiver/tgzfs"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	. "github.com/pivotal-golang/archiver/compressor"
 )
 
-var _ = Describe("WriteTar", func() {
+var _ = Describe("Compress", func() {
 	var srcPath string
 	var buffer *bytes.Buffer
-	var writeErr error
+	var compressErr error
 
 	BeforeEach(func() {
 		dir, err := ioutil.TempDir("", "archive-dir")
@@ -42,13 +42,16 @@ var _ = Describe("WriteTar", func() {
 	})
 
 	JustBeforeEach(func() {
-		writeErr = WriteTar(srcPath, buffer)
+		compressErr = tgzfs.Compress(srcPath, buffer)
 	})
 
-	It("returns a reader representing a .tar stream", func() {
-		Expect(writeErr).NotTo(HaveOccurred())
+	It("writes a .tar.gz stream to the writer", func() {
+		Expect(compressErr).NotTo(HaveOccurred())
 
-		reader := tar.NewReader(buffer)
+		gr, err := gzip.NewReader(buffer)
+		Expect(err).NotTo(HaveOccurred())
+
+		reader := tar.NewReader(gr)
 
 		header, err := reader.Next()
 		Expect(err).NotTo(HaveOccurred())
@@ -82,9 +85,12 @@ var _ = Describe("WriteTar", func() {
 		})
 
 		It("archives the directory's contents", func() {
-			Expect(writeErr).NotTo(HaveOccurred())
+			Expect(compressErr).NotTo(HaveOccurred())
 
-			reader := tar.NewReader(buffer)
+			gr, err := gzip.NewReader(buffer)
+			Expect(err).NotTo(HaveOccurred())
+
+			reader := tar.NewReader(gr)
 
 			header, err := reader.Next()
 			Expect(err).NotTo(HaveOccurred())
@@ -119,9 +125,12 @@ var _ = Describe("WriteTar", func() {
 		})
 
 		It("archives the single file at the root", func() {
-			Expect(writeErr).NotTo(HaveOccurred())
+			Expect(compressErr).NotTo(HaveOccurred())
 
-			reader := tar.NewReader(buffer)
+			gr, err := gzip.NewReader(buffer)
+			Expect(err).NotTo(HaveOccurred())
+
+			reader := tar.NewReader(gr)
 
 			header, err := reader.Next()
 			Expect(err).NotTo(HaveOccurred())
@@ -140,7 +149,7 @@ var _ = Describe("WriteTar", func() {
 		})
 
 		It("returns an error", func() {
-			Expect(writeErr).To(BeAssignableToTypeOf(&os.PathError{}))
+			Expect(compressErr).To(BeAssignableToTypeOf(&os.PathError{}))
 		})
 	})
 })

@@ -1,4 +1,4 @@
-package extractor
+package tgzfs
 
 import (
 	"archive/tar"
@@ -10,62 +10,38 @@ import (
 	"path/filepath"
 )
 
-type tgzExtractor struct{}
-
-func NewTgz() Extractor {
-	return &tgzExtractor{}
-}
-
-func (e *tgzExtractor) Extract(src, dest string) error {
-	srcType, err := mimeType(src)
-	if err != nil {
-		return err
-	}
-
-	switch srcType {
-	case "application/x-gzip":
-		err := extractTgz(src, dest)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("%s is not a tgz archive: %s", src, srcType)
-	}
-
-	return nil
-}
-
-func extractTgz(src, dest string) error {
+func Extract(src io.Reader, dest string) error {
 	tarPath, err := exec.LookPath("tar")
-
 	if err == nil {
 		err := os.MkdirAll(dest, 0755)
 		if err != nil {
 			return err
 		}
 
-		return exec.Command(tarPath, "pzxf", src, "-C", dest).Run()
+		tarCmd := exec.Command(tarPath, "pzxf", "-", "-C", dest)
+		tarCmd.Stdin = src
+
+		out, err := tarCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("tar extract failed (%s). output: %q", err, out)
+		}
+
+		return nil
 	}
 
-	fd, err := os.Open(src)
+	gr, err := gzip.NewReader(src)
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
 
-	gReader, err := gzip.NewReader(fd)
-	if err != nil {
-		return err
-	}
-	defer gReader.Close()
-
-	tarReader := tar.NewReader(gReader)
+	tarReader := tar.NewReader(gr)
 
 	for {
 		hdr, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return err
 		}
@@ -102,15 +78,17 @@ func extractTarArchiveFile(header *tar.Header, dest string, input io.Reader) err
 			return os.Symlink(header.Linkname, filePath)
 		}
 
-		fileCopy, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileInfo.Mode())
-		if err != nil {
-			return err
-		}
-		defer fileCopy.Close()
+		if fileInfo.Mode().IsRegular() {
+			fileCopy, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileInfo.Mode())
+			if err != nil {
+				return err
+			}
+			defer fileCopy.Close()
 
-		_, err = io.Copy(fileCopy, input)
-		if err != nil {
-			return err
+			_, err = io.Copy(fileCopy, input)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

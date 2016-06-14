@@ -1,8 +1,7 @@
-package extractor
+package zipfs
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,46 +9,20 @@ import (
 	"path/filepath"
 )
 
-type zipExtractor struct{}
-
-func NewZip() Extractor {
-	return &zipExtractor{}
-}
-
-func (e *zipExtractor) Extract(src, dest string) error {
-	srcType, err := mimeType(src)
-	if err != nil {
-		return err
-	}
-
-	switch srcType {
-	case "application/zip":
-		err := extractZip(src, dest)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("%s is not a zip archive: %s", src, srcType)
-	}
-
-	return nil
-}
-
-func extractZip(src, dest string) error {
+func Extract(srcFile string, dest string) error {
 	path, err := exec.LookPath("unzip")
-
 	if err == nil {
-		err := os.MkdirAll(dest, 0755)
+		err = os.MkdirAll(dest, 0755)
 		if err != nil {
 			return err
 		}
 
-		unzipCmd := exec.Command(path, src)
+		unzipCmd := exec.Command(path, srcFile)
 		unzipCmd.Dir = dest
 
 		return unzipCmd.Run()
 	} else {
-		files, err := zip.OpenReader(src)
+		files, err := zip.OpenReader(srcFile)
 		if err != nil {
 			return err
 		}
