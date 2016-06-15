@@ -59,35 +59,16 @@ var _ = Describe("Compress", func() {
 			It("archives the directory's contents", func() {
 				Expect(compressErr).NotTo(HaveOccurred())
 
-				gr, err := gzip.NewReader(buffer)
+				dest, err := ioutil.TempDir("", "extracted")
 				Expect(err).NotTo(HaveOccurred())
 
-				reader := tar.NewReader(gr)
+				defer os.RemoveAll(dest)
 
-				header, err := reader.Next()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(header.Name).To(Equal("./"))
-				Expect(header.FileInfo().IsDir()).To(BeTrue())
+				tgzfs.Extract(buffer, dest)
 
-				header, err = reader.Next()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir"))
-				Expect(header.FileInfo().IsDir()).To(BeTrue())
+				Expect(ioutil.ReadFile(filepath.Join(dest, "inner-dir", "some-file"))).To(Equal([]byte("sup")))
 
-				header, err = reader.Next()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir/some-file"))
-				Expect(header.FileInfo().IsDir()).To(BeFalse())
-
-				contents, err := ioutil.ReadAll(reader)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(string(contents)).To(Equal("sup"))
-
-				header, err = reader.Next()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(filepath.Clean(header.Name)).To(Equal("inner-dir/some-symlink"))
-				Expect(header.FileInfo().Mode() & os.ModeSymlink).To(Equal(os.ModeSymlink))
-				Expect(header.Linkname).To(Equal("some-file"))
+				Expect(os.Readlink(filepath.Join(dest, "inner-dir", "some-symlink"))).To(Equal("some-file"))
 			})
 		})
 

@@ -38,7 +38,7 @@ func tarExtract(tarPath string, src io.Reader, dest string) error {
 func tarCompress(tarPath string, dest io.Writer, workDir string, paths ...string) error {
 	out := new(bytes.Buffer)
 
-	tarCmd := exec.Command(tarPath, "-czf", "-", "--sort=name", "--null", "-T", "-")
+	tarCmd := exec.Command(tarPath, "-czf", "-", "--null", "-T", "-")
 	tarCmd.Dir = workDir
 	tarCmd.Stderr = out
 	tarCmd.Stdout = dest
