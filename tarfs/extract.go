@@ -6,12 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
 func Extract(src io.Reader, dest string) error {
-	tarPath, err := exec.LookPath("tar")
-	if err == nil {
-		return tarExtract(tarPath, src, dest)
+	if runtime.GOOS != "windows" {
+		tarPath, err := exec.LookPath("tar")
+		if err == nil {
+			return tarExtract(tarPath, src, dest)
+		}
 	}
 
 	tarReader := tar.NewReader(src)

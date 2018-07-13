@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/concourse/go-archive/tgzfs"
 	. "github.com/onsi/ginkgo"
@@ -112,6 +113,9 @@ var _ = Describe("Compress", func() {
 
 	Context("with tar in the PATH", func() {
 		BeforeEach(func() {
+			if runtime.GOOS == "windows" {
+				Skip("use go archive library only for windows")
+			}
 			_, err := exec.LookPath("tar")
 			Expect(err).ToNot(HaveOccurred())
 		})
