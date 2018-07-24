@@ -6,11 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
 func Compress(dest io.Writer, workDir string, paths ...string) error {
-	if tarPath, err := exec.LookPath("tar"); err == nil {
-		return tarCompress(tarPath, dest, workDir, paths...)
+	if runtime.GOOS != "windows" {
+		if tarPath, err := exec.LookPath("tar"); err == nil {
+			return tarCompress(tarPath, dest, workDir, paths...)
+		}
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)

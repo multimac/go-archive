@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/concourse/go-archive/archivetest"
 	"github.com/concourse/go-archive/zipfs"
@@ -84,7 +85,9 @@ var _ = Describe("Extract", func() {
 
 		executableInfo, err := executable.Stat()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(executableInfo.Mode()).To(Equal(os.FileMode(0644)))
+		if runtime.GOOS != "windows" {
+			Expect(executableInfo.Mode()).To(Equal(os.FileMode(0644)))
+		}
 
 		emptyDir, err := os.Open(filepath.Join(extractionDest, "empty-dir"))
 		Expect(err).NotTo(HaveOccurred())
@@ -101,11 +104,16 @@ var _ = Describe("Extract", func() {
 		symlinkInfo, err := os.Lstat(filepath.Join(extractionDest, "some-symlink"))
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(symlinkInfo.Mode() & 0755).To(Equal(os.FileMode(0755)))
+		if runtime.GOOS != "windows" {
+			Expect(symlinkInfo.Mode() & 0755).To(Equal(os.FileMode(0755)))
+		}
 	}
 
 	Context("when 'unzip' is on the PATH", func() {
 		BeforeEach(func() {
+			if runtime.GOOS == "windows" {
+				Skip("unzip is not valid on Windows")
+			}
 			_, err := exec.LookPath("unzip")
 			Expect(err).NotTo(HaveOccurred())
 		})
