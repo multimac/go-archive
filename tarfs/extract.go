@@ -19,6 +19,8 @@ func Extract(src io.Reader, dest string) error {
 
 	tarReader := tar.NewReader(src)
 
+	chown := os.Getuid() == 0
+
 	for {
 		hdr, err := tarReader.Next()
 		if err == io.EOF {
@@ -33,7 +35,7 @@ func Extract(src io.Reader, dest string) error {
 			continue
 		}
 
-		err = extractTarArchiveFile(hdr, dest, tarReader)
+		err = ExtractEntry(hdr, dest, tarReader, chown)
 		if err != nil {
 			return err
 		}
@@ -42,36 +44,67 @@ func Extract(src io.Reader, dest string) error {
 	return nil
 }
 
-func extractTarArchiveFile(header *tar.Header, dest string, input io.Reader) error {
+func ExtractEntry(header *tar.Header, dest string, input io.Reader, chown bool) error {
 	filePath := filepath.Join(dest, header.Name)
 	fileInfo := header.FileInfo()
+	fileMode := fileInfo.Mode()
 
-	if fileInfo.IsDir() {
-		err := os.MkdirAll(filePath, fileInfo.Mode())
+	err := os.MkdirAll(filepath.Dir(filePath), 0755)
+	if err != nil {
+		return err
+	}
+
+	switch header.Typeflag {
+	case tar.TypeLink:
+		err := os.Link(filepath.Join(dest, header.Linkname), filePath)
 		if err != nil {
 			return err
 		}
-	} else {
-		err := os.MkdirAll(filepath.Dir(filePath), 0755)
+
+		// skip chmod/chown
+		return nil
+
+	case tar.TypeSymlink:
+		err := os.Symlink(header.Linkname, filePath)
 		if err != nil {
 			return err
 		}
 
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			return os.Symlink(header.Linkname, filePath)
+		// skip chmod/chown
+		return nil
+
+	case tar.TypeDir:
+		err := os.MkdirAll(filePath, fileMode)
+		if err != nil {
+			return err
 		}
 
-		if fileInfo.Mode().IsRegular() {
-			fileCopy, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileInfo.Mode())
-			if err != nil {
-				return err
-			}
-			defer fileCopy.Close()
+	case tar.TypeReg:
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
 
-			_, err = io.Copy(fileCopy, input)
-			if err != nil {
-				return err
-			}
+		_, err = io.Copy(file, input)
+		if err != nil {
+			return err
+		}
+
+		err = file.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = os.Chmod(filePath, fileMode)
+	if err != nil {
+		return err
+	}
+
+	if chown {
+		err = os.Chown(filePath, header.Uid, header.Gid)
+		if err != nil {
+			return err
 		}
 	}
 

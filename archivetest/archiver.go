@@ -91,9 +91,10 @@ func (files Archive) WriteTar(writer io.Writer) error {
 			}
 		} else {
 			header = &tar.Header{
-				Name: file.Name,
-				Mode: mode,
-				Size: int64(len(file.Body)),
+				Typeflag: tar.TypeReg,
+				Name:     file.Name,
+				Mode:     mode,
+				Size:     int64(len(file.Body)),
 			}
 		}
 

@@ -6,8 +6,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
+
+	"github.com/concourse/go-archive/tarfs"
 )
 
 func Extract(src io.Reader, dest string) error {
@@ -25,6 +26,8 @@ func Extract(src io.Reader, dest string) error {
 
 	tarReader := tar.NewReader(gr)
 
+	chown := os.Getuid() == 0
+
 	for {
 		hdr, err := tarReader.Next()
 		if err == io.EOF {
@@ -39,45 +42,9 @@ func Extract(src io.Reader, dest string) error {
 			continue
 		}
 
-		err = extractTarArchiveFile(hdr, dest, tarReader)
+		err = tarfs.ExtractEntry(hdr, dest, tarReader, chown)
 		if err != nil {
 			return err
-		}
-	}
-
-	return nil
-}
-
-func extractTarArchiveFile(header *tar.Header, dest string, input io.Reader) error {
-	filePath := filepath.Join(dest, header.Name)
-	fileInfo := header.FileInfo()
-
-	if fileInfo.IsDir() {
-		err := os.MkdirAll(filePath, fileInfo.Mode())
-		if err != nil {
-			return err
-		}
-	} else {
-		err := os.MkdirAll(filepath.Dir(filePath), 0755)
-		if err != nil {
-			return err
-		}
-
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			return os.Symlink(header.Linkname, filePath)
-		}
-
-		if fileInfo.Mode().IsRegular() {
-			fileCopy, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileInfo.Mode())
-			if err != nil {
-				return err
-			}
-			defer fileCopy.Close()
-
-			_, err = io.Copy(fileCopy, input)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
