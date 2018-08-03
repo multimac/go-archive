@@ -2,6 +2,7 @@ package tarfs
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -79,7 +80,7 @@ func ExtractEntry(header *tar.Header, dest string, input io.Reader, chown bool) 
 			return err
 		}
 
-	case tar.TypeReg:
+	case tar.TypeReg, tar.TypeRegA:
 		file, err := os.Create(filePath)
 		if err != nil {
 			return err
@@ -94,6 +95,12 @@ func ExtractEntry(header *tar.Header, dest string, input io.Reader, chown bool) 
 		if err != nil {
 			return err
 		}
+
+	case tar.TypeBlock:
+	case tar.TypeChar:
+		header.
+	default:
+		return fmt.Errorf("%s: unsupported entry type (%c)", header.Name, header.Typeflag)
 	}
 
 	err = os.Chmod(filePath, fileMode)
