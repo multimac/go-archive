@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/concourse/go-archive/archivetest"
 	"github.com/concourse/go-archive/tarfs"
@@ -25,8 +26,10 @@ var _ = Describe("Extract", func() {
 			Dir:  true,
 		},
 		{
-			Name: "./some-file",
-			Body: "some-file-contents",
+			Name:       "./some-file",
+			Body:       "some-file-contents",
+			AccessTime: time.Unix(12345, 0), // dont expect subsecond precision
+			ModTime:    time.Unix(98765, 0), // dont expect subsecond precision
 		},
 		{
 			Name: "./empty-dir/",
@@ -72,9 +75,16 @@ var _ = Describe("Extract", func() {
 	})
 
 	extractionTest := func() {
-		fileContents, err := ioutil.ReadFile(filepath.Join(extractionDest, "some-file"))
+		someFile := filepath.Join(extractionDest, "some-file")
+
+		fileContents, err := ioutil.ReadFile(someFile)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(fileContents)).To(Equal("some-file-contents"))
+
+		stat, err := os.Stat(someFile)
+		Expect(err).NotTo(HaveOccurred())
+		// can't really assert access time...
+		Expect(stat.ModTime()).To(Equal(time.Unix(98765, 0)))
 
 		fileContents, err = ioutil.ReadFile(filepath.Join(extractionDest, "nonempty-dir", "file-in-dir"))
 		Expect(err).NotTo(HaveOccurred())

@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 type Archive []ArchiveFile
@@ -18,6 +19,9 @@ type ArchiveFile struct {
 	Mode int64
 	Dir  bool
 	Link string
+
+	ModTime    time.Time
+	AccessTime time.Time
 }
 
 func (files Archive) TarGZStream() (io.Reader, error) {
@@ -91,10 +95,12 @@ func (files Archive) WriteTar(writer io.Writer) error {
 			}
 		} else {
 			header = &tar.Header{
-				Typeflag: tar.TypeReg,
-				Name:     file.Name,
-				Mode:     mode,
-				Size:     int64(len(file.Body)),
+				Typeflag:   tar.TypeReg,
+				Name:       file.Name,
+				Mode:       mode,
+				Size:       int64(len(file.Body)),
+				ModTime:    file.ModTime,
+				AccessTime: file.AccessTime,
 			}
 		}
 
