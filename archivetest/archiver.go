@@ -142,6 +142,10 @@ func (files Archive) WriteZip(writer io.Writer) error {
 			header.SetMode(os.FileMode(mode))
 		}
 
+		if !file.ModTime.IsZero() {
+			header.SetModTime(file.ModTime)
+		}
+
 		f, err := w.CreateHeader(header)
 		if err != nil {
 			return err
