@@ -1,4 +1,4 @@
-// +build !windows,!freebsd
+// +build freebsd
 
 package tarfs
 
@@ -20,7 +20,7 @@ func mknodEntry(hdr *tar.Header, path string) error {
 		mode |= unix.S_IFIFO
 	}
 
-	return syscall.Mknod(path, mode, int(mkdev(hdr.Devmajor, hdr.Devminor)))
+	return syscall.Mknod(path, mode, uint64(mkdev(hdr.Devmajor, hdr.Devminor)))
 }
 
 func mkdev(major, minor int64) uint32 {
