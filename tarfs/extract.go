@@ -79,7 +79,13 @@ func ExtractEntry(header *tar.Header, dest string, input io.Reader, chown bool) 
 		}
 
 	case tar.TypeSymlink:
-		err := os.Symlink(header.Linkname, filePath)
+		targetPath := filepath.Join(dest, header.Linkname)
+
+		if !strings.HasPrefix(targetPath, dest) {
+			return BreakoutError{header.Name, header.Linkname}
+		}
+
+		err := os.Symlink(filepath.Join(dest, header.Linkname), filePath)
 		if err != nil {
 			return err
 		}
